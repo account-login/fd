@@ -92,8 +92,47 @@ fn run() -> Result<ExitCode> {
         .or_else(|| matches.values_of_os("search-path"));
 
     let mut search_paths = if let Some(paths) = passed_arguments {
+        use std::ffi::OsString;
+        let mut new_paths: Vec<OsString> = Vec::new();
+        if cfg!(windows) && matches.is_present("cygwin-path") {
+            // translate passed_arguments
+            let mut npath: usize = 0;
+            use std::process::Command;
+            let mut cmd = Command::new("cygpath");
+            cmd.arg("-w");
+            for p in paths {
+                cmd.arg(p);
+                npath += 1;
+            }
+
+            let out = cmd.output()?;
+            match out.status.code() {
+                Some(code) => if code != 0 {
+                    return Err(anyhow!(format!("cygpath existed with {}", code)));
+                },
+                None => return Err(anyhow!(format!("cygpath existed with signal"))),
+            };
+
+            // XXX: this will explode when path contains \n
+            for slice in out.stdout.split(|&ch| ch == b'\n') {
+                if slice.len() == 0 {
+                    continue;
+                }
+                let s = String::from_utf8(slice.to_vec())?;
+                new_paths.push(OsString::from(s));
+            }
+            if new_paths.len() != npath {
+                return Err(anyhow!(format!("cygpath return {} paths from {} inputs", new_paths.len(), npath)));
+            }
+        } else {
+            // no path translation
+            for p in paths {
+                new_paths.push(OsString::from(p));
+            }
+        }
+
         let mut directories = vec![];
-        for path in paths {
+        for path in new_paths {
             let path_buffer = PathBuf::from(path);
             if filesystem::is_dir(&path_buffer) {
                 directories.push(path_buffer);

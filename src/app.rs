@@ -538,6 +538,15 @@ pub fn build_app() -> App<'static, 'static> {
                 ),
         )
         .arg(
+            Arg::with_name("cygwin-path")
+                .long("cygwin-path")
+                .hidden_short_help(true)
+                .long_help(
+                    "This flag allows the use of posix paths. The paths in command line will be \
+                         translated into windows paths by the `cygpath` command",
+                ),
+        )
+        .arg(
             Arg::with_name("path")
                 .multiple(true)
                 .help("the root directory for the filesystem search (optional)")
